@@ -1,0 +1,7 @@
+# core-toolkit-for-claude (install.sh)
+.codex/commands/
+.codex/hooks/
+.codex/scripts/
+.codex/skills/
+.codex/templates/
+.codex/hooks.json
