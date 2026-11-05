@@ -1,0 +1,10 @@
+{
+  "repo_id": "id3-tag",
+  "package_manager": "unknown",
+  "doc_roots": ["docs/L0_concept", "docs/L1_project", "docs/L2_development", "docs/L3_implementation"],
+  "commands": {},
+  "primary_docs": {
+    "investigation": "docs/L3_implementation/specification_summary.md",
+    "structure": "docs/L1_project/repository_structure.md"
+  }
+}
