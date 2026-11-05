@@ -2,12 +2,13 @@
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MP3 Tag Editor</title><link rel="stylesheet" href="/static/style.css"></head>
 <body>
-<header><h1>MP3 Tag Editor</h1><span>閲覧・再生</span></header>
+<header><div class="brand-mark" aria-hidden="true">♪</div><h1>Music <span>Tag Editor</span></h1><span class="header-note">YOUR MUSIC LIBRARY</span></header>
 <main>
-  <aside><h2>ファイル</h2><div id="directory"></div><div id="files"></div></aside>
+  <aside><div class="sidebar-heading"><span>LIBRARY</span><h2>ファイル</h2></div><div id="directory"></div><div id="files"></div></aside>
   <section class="detail"><div id="status" role="status">ファイルを選択してください。</div><div id="selected" hidden>
-    <div class="player"><div class="cover"><img id="artwork" alt="アートワーク" hidden><span id="no-artwork">画像なし</span></div><div class="playback"><h2 id="filename"></h2><audio id="audio" controls preload="metadata"></audio></div></div>
-    <section class="tags"><h2>既存タグ</h2><dl id="tags"></dl></section>
+    <div class="player"><div class="cover"><img id="artwork" alt="アートワーク" hidden><span id="no-artwork">♪</span></div><div class="playback"><span class="eyebrow">NOW SELECTED</span><h2 id="filename"></h2><audio id="audio" controls preload="metadata"></audio></div></div>
+    <section class="tags lookup-panel"><div class="section-heading"><div><span class="eyebrow">METADATA LOOKUP</span><h2>タグ情報を探す</h2><p class="section-description">音声から曲を識別し、アルバムと版を選択します。</p></div><button id="lookup-button" class="primary-action">タグ情報を取得</button></div><label class="language-label" for="release-language">取得情報の言語<select id="release-language"><option value="all">すべて</option><option value="eng">英語</option><option value="jpn">日本語</option><option value="unknown">言語未登録</option></select></label><p class="language-note">登録された版の言語で絞り込みます。翻訳は行いません。</p><p id="lookup-status" role="status"></p><p id="lookup-warning" role="status"></p><div id="candidates"></div></section>
+    <section class="tags" id="online"><span class="eyebrow">TAG COMPARISON</span><h2>タグ情報の比較</h2><p class="section-description">取得した候補とファイルに保存されている情報を確認できます。</p><div class="artwork-comparison"><div><h3>取得画像</h3><div class="cover"><img id="online-artwork" alt="取得したアートワーク" hidden><span id="no-online-artwork">画像なし</span></div></div><div><h3>既存画像</h3><div class="cover"><img id="existing-artwork" alt="既存のアートワーク" hidden><span id="no-existing-artwork">画像なし</span></div></div></div><table><thead><tr><th>項目</th><th>取得情報</th><th>既存情報</th></tr></thead><tbody id="comparison-rows"></tbody></table></section>
   </div></section>
 </main>
 <script src="/static/app.js" defer></script>
