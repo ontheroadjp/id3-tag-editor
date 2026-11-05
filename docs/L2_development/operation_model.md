@@ -1,3 +1,5 @@
 # 開発・運用
 
-起動・ビルド・テスト手順は未確認です。CI 定義や実行定義がまだ存在しないため、追加後に確認してください。
+`MUSIC_DIR` を設定し `docker compose up --build` で起動、`docker compose down` で停止する（根拠: README.md:13-20、compose.yaml:1-15）。音楽ディレクトリは読み取り専用。
+
+Python のテスト依存関係は `pip install '.[test]'` で導入し、`pytest -q` で実行する（根拠: README.md:22、pyproject.toml:7-11）。CI 定義は存在しない。
