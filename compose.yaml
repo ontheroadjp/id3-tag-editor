@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:18081:8000"
+    environment:
+      MUSIC_DIR: /music
+    volumes:
+      - type: bind
+        source: ${MUSIC_DIR:?Set MUSIC_DIR to the music directory}
+        target: /music
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
