@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from mutagen import MutagenError
 from mutagen.id3 import ID3, ID3NoHeaderError
 from mutagen.mp4 import MP4, MP4Cover
+from app import lookup
 
 ROOT = Path(os.environ.get("MUSIC_DIR", "/music")).resolve()
 STATIC = Path(__file__).parent / "static"
@@ -17,6 +18,37 @@ MP4_FIELDS = {"title": "\u00a9nam", "artist": "\u00a9ART", "album": "\u00a9alb",
 FORMATS = {".mp3": "audio/mpeg", ".m4a": "audio/mp4"}
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.post("/api/files/{identifier}/lookup", status_code=202)
+def start_lookup(identifier: str) -> dict[str, str]:
+    path = resolve_id(identifier)
+    try:
+        return {"job_id": lookup.start_lookup(path)}
+    except lookup.LookupError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@app.get("/api/lookups/{job_id}")
+def lookup_status(job_id: str) -> dict[str, object]:
+    job = lookup.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="取得処理が見つかりません。")
+    return job
+
+
+@app.delete("/api/lookups/{job_id}", status_code=204)
+def cancel_lookup(job_id: str) -> Response:
+    lookup.cancel_job(job_id)
+    return Response(status_code=204)
+
+
+@app.get("/api/recordings/{recording_id}/releases/{release_id}")
+def selected_release(recording_id: str, release_id: str) -> dict[str, object]:
+    try:
+        return lookup.release_details(recording_id, release_id)
+    except lookup.LookupError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
 
 
 def encode_path(path: Path) -> str:

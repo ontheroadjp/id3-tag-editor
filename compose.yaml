@@ -5,6 +5,7 @@ services:
       - "127.0.0.1:18081:8000"
     environment:
       MUSIC_DIR: /music
+      ACOUSTID_API_KEY: ${ACOUSTID_API_KEY:-}
     volumes:
       - type: bind
         source: ${MUSIC_DIR:?Set MUSIC_DIR to the music directory}
