@@ -1,3 +1,3 @@
 # 整合性確認
 
-変更時は README の起動方法、Compose の音楽ディレクトリと公開設定、API と画面表示、テストを照合する（根拠: README.md:15-27、compose.yaml:1-16、app/main.py:23-51,85-146、tests/test_lookup.py:21-282）。CI 定義は存在しない。
+README の起動・書き込み設定を Compose と照合し、API、画面、SQLite 履歴、復旧とテストを確認する（根拠: compose.yaml:1-23、app/main.py:164-322、app/tag_editor.py:309-443,879-974、tests/test_app.py、tests/test_tag_editor.py）。CI 定義は確認されていない。

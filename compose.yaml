@@ -5,12 +5,19 @@ services:
       - "127.0.0.1:18081:8000"
     environment:
       MUSIC_DIR: /music
+      DATA_DIR: /data
+      LIBRARY_ID: ${MUSIC_DIR:?Set MUSIC_DIR to the music directory}
+      ENABLE_TAG_WRITES: ${ENABLE_TAG_WRITES:-0}
       ACOUSTID_API_KEY: ${ACOUSTID_API_KEY:-}
     volumes:
       - type: bind
         source: ${MUSIC_DIR:?Set MUSIC_DIR to the music directory}
         target: /music
-        read_only: true
+        read_only: ${MUSIC_READ_ONLY:-true}
         bind:
           create_host_path: false
+      - app-data:/data
     restart: unless-stopped
+
+volumes:
+  app-data:
