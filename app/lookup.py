@@ -148,7 +148,12 @@ def release_details(recording_id: str, release_id: str) -> dict[str, object]:
                 number = str(track.get("number", ""))
                 total = medium.get("track-count")
                 tracknumber = f"{number}/{total}" if number.isdecimal() and isinstance(total, int) and total > 0 else number
-                return {"title": track.get("title") or recording.get("title", ""), "artist": artist_credit(track.get("artist-credit") or recording.get("artist-credit") or []), "album": release.get("title", ""), "albumartist": artist_credit(release.get("artist-credit", [])), "date": release.get("date", ""), "tracknumber": tracknumber, "genre": "", "artwork_url": f"https://coverartarchive.org/release/{release_id}/front-250"}
+                position = medium.get("position")
+                medium_count = release.get("medium-count")
+                discnumber = str(position) if isinstance(position, int) and position > 0 else ""
+                if discnumber and isinstance(medium_count, int) and medium_count > 0:
+                    discnumber += f"/{medium_count}"
+                return {"title": track.get("title") or recording.get("title", ""), "artist": artist_credit(track.get("artist-credit") or recording.get("artist-credit") or []), "album": release.get("title", ""), "albumartist": artist_credit(release.get("artist-credit", [])), "date": release.get("date", ""), "tracknumber": tracknumber, "discnumber": discnumber, "genre": "", "artwork_url": f"https://coverartarchive.org/release/{release_id}/front-250", "artwork_back_url": f"https://coverartarchive.org/release/{release_id}/back-250"}
     raise LookupError("選択したリリースに録音が見つかりませんでした。")
 
 
