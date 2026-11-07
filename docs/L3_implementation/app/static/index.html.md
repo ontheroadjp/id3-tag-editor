@@ -5,6 +5,7 @@
 
 ## 変更履歴（git log より自動生成）
 
-- 9fd8407 feat(#8): support safe tag editing and history restoration
+- 8f18d7f feat(#10): save and apply named tag presets
+- fffe586 feat(#8): support safe tag editing and history restoration (#9)
 - ebe4570 feat(#4): add metadata lookup and comparison (#5)
 - a0ddcbe feat(#2): add read-only music browsing and playback (#3)
