@@ -1,6 +1,7 @@
 # app/static/style.css
 
 - デスクトップの左右分割、候補・タグ比較、画像と履歴、および狭い画面での表示を定義する（根拠: app/static/style.css:1-83）。
+- プリセット操作の折り返しと入力欄の表示を定義する（根拠: app/static/style.css:74-75）。
 
 ## 変更履歴（git log より自動生成）
 
