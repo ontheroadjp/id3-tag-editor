@@ -71,6 +71,8 @@ td:first-child, th:first-child { width: 22%; color: #7d8c85; font-size: .8rem; }
 #comparison-rows input, #comparison-rows select { box-sizing: border-box; width: 100%; padding: 8px; border: 1px solid #d9e1de; border-radius: 6px; }
 #comparison-rows select { margin-top: 6px; }
 .edit-actions { display: flex; gap: 8px; margin: 12px 0; }
+.preset-actions { flex-wrap: wrap; align-items: center; }
+.preset-actions input, .preset-actions select { max-width: 100%; padding: 7px; border: 1px solid #d9e1de; border-radius: 6px; font: inherit; }
 .edit-actions button, #history button, #refresh-existing { padding: 7px 11px; border: 1px solid #a6bdb4; border-radius: 6px; background: white; color: #285a49; }
 .field-toggle { width: 40px; min-height: 34px; border: 1px solid #a6bdb4; border-radius: 6px; background: #fff; color: #285a49; }
 .field-toggle[aria-pressed="true"] { background: #e8f2ed; }

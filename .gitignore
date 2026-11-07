@@ -5,3 +5,4 @@
 .codex/skills/
 .codex/templates/
 .codex/hooks.json
+__pycache__/

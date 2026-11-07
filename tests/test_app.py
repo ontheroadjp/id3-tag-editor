@@ -57,6 +57,36 @@ def test_directory_and_tags(library):
     assert song.read_bytes() == before
 
 
+def test_named_presets_persist_without_modifying_music(library, monkeypatch):
+    client, root, song = library
+    before = song.read_bytes()
+    tags = {key: key for key in ('artist', 'album', 'albumartist', 'date', 'tracknumber', 'discnumber', 'genre')}
+    headers = {'host': 'localhost:18081', 'origin': 'http://localhost:18081'}
+    monkeypatch.setattr('app.main.WRITES_ENABLED', False)
+    def chunk(kind, data):
+        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+
+    png = (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 6, 0, 0, 0))
+           + chunk(b'IDAT', zlib.compress(b'\x00\x00\x00\x00\xff')) + chunk(b'IEND', b''))
+    image = {'data': base64.b64encode(png).decode(), 'mime': 'image/png', 'description': None}
+    payload = {'name': 'Example', 'tags': tags, 'artwork': {'front': image}}
+    assert client.post('/api/presets', json=payload, headers=headers).status_code == 201
+    assert client.post('/api/presets', json=payload, headers=headers).status_code == 409
+    assert client.get('/api/presets', headers=headers).json() == [payload]
+    updated = {**payload, 'tags': {**tags, 'artist': 'new artist'}}
+    assert client.put('/api/presets', json=updated, headers=headers).status_code == 200
+    assert client.get('/api/presets', headers=headers).json() == [updated]
+    assert client.delete('/api/presets', params={'name': 'Example'}, headers={'host': 'localhost:18081', 'origin': 'http://evil.example'}).status_code == 403
+    assert client.delete('/api/presets', params={'name': 'Example'}, headers=headers).status_code == 200
+    assert client.get('/api/presets', headers=headers).json() == []
+    assert client.delete('/api/presets', params={'name': 'Example'}, headers=headers).status_code == 404
+    assert client.put('/api/presets', json=updated, headers=headers).status_code == 404
+    assert client.post('/api/presets', json={**payload, 'tags': {**tags, 'title': 'forbidden'}}, headers=headers).status_code == 422
+    assert client.post('/api/presets', json={**payload, 'name': 'Invalid', 'artwork': {'front': {'data': 'bad', 'mime': 'image/png'}}}, headers=headers).status_code == 422
+    assert client.post('/api/presets', json=payload, headers={'host': 'localhost:18081', 'origin': 'http://evil.example'}).status_code == 403
+    assert song.read_bytes() == before
+
+
 def test_reject_paths_outside_root(library):
     client, root, song = library
     assert client.get(f"/api/files/{identifier('../outside.mp3')}").status_code == 404

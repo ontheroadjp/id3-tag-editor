@@ -34,6 +34,95 @@ let operationBusy = false;
 let pendingArtworkLoads = 0;
 let selectedLanguage = 'all';
 let blockingHistory = false;
+const presetFields = Object.keys(labels).filter((key) => key !== 'title' && key !== 'comment');
+let presets = [];
+
+async function loadPresets() {
+  presets = await getJson('/api/presets');
+  const select = document.querySelector('#preset-select');
+  select.replaceChildren(new Option('選択してください', ''));
+  presets.forEach((preset, index) => select.add(new Option(preset.name, String(index))));
+}
+
+async function savePreset() {
+  const status = document.querySelector('#preset-status');
+  const name = document.querySelector('#preset-name').value.trim();
+  if (!name) { status.textContent = 'プリセット名を入力してください。'; return; }
+  if (!currentFile || pendingArtworkLoads || operationBusy) { status.textContent = 'ファイルを選択し、画像の読み込みが終わるまでお待ちください。'; return; }
+  const artwork = {};
+  try {
+    const current = generation;
+    for (const side of Object.keys(artworkChoices)) {
+      let image = artworkCandidate(side);
+      const items = existingArtworks[side] || [];
+      if (!image && items.length) {
+        const index = artworkTargets[side];
+        if (index === null) throw new Error('プリセットに保存する既存画像を選択してください。');
+        const imageSide = side === 'back' ? 'back' : 'front';
+        const response = await fetch(`/api/files/${encodeURIComponent(currentFile)}/artwork?side=${imageSide}&index=${index}&v=${encodeURIComponent(fileVersion)}`);
+        if (!response.ok) throw new Error('既存画像を読み込めませんでした。');
+        image = await artworkData(await response.blob());
+      }
+      if (image && !image.delete) artwork[side === 'cover' ? 'front' : side] = {data: image.data, mime: image.mime};
+    }
+    if (current !== generation) return;
+    const payload = {name, tags: Object.fromEntries(presetFields.map((key) => [key, draftTags[key] || ''])), artwork};
+    try {
+      await postJson('/api/presets', 'POST', payload);
+    } catch (error) {
+      if (error.status !== 409) throw error;
+      if (!window.confirm('同じ名前のプリセットが存在します。上書きしますか？')) return;
+      await postJson('/api/presets', 'PUT', payload);
+    }
+    await loadPresets();
+    status.textContent = 'プリセットを保存しました。';
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function applyPreset() {
+  const status = document.querySelector('#preset-status');
+  const value = document.querySelector('#preset-select').value;
+  if (!currentFile || value === '' || operationBusy) { status.textContent = 'ファイルとプリセットを選択してください。'; return; }
+  const preset = presets[Number(value)];
+  if (!preset) return;
+  const current = generation;
+  try {
+    const images = {};
+    for (const [side, image] of Object.entries(preset.artwork)) {
+      const bytes = Uint8Array.from(atob(image.data), (character) => character.charCodeAt(0));
+      images[side] = await artworkData(new Blob([bytes], {type: image.mime}));
+    }
+    if (current !== generation) return;
+    for (const key of presetFields) { draftTags[key] = preset.tags[key]; selectedFields.add(key); }
+    for (const [side, image] of Object.entries(images)) {
+      const target = fileFormat === 'm4a' ? (side === 'front' ? 'cover' : null) : side;
+      if (!target) continue;
+      artworkUploads[target] = image;
+      artworkChoices[target] = 'upload';
+      selectedArtwork.add(target);
+    }
+    renderComparison(); renderArtworkControls();
+    status.textContent = 'プリセットを読み出しました。内容を確認して「保存する」を押してください。';
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function deletePreset() {
+  const status = document.querySelector('#preset-status');
+  const value = document.querySelector('#preset-select').value;
+  const preset = value === '' ? null : presets[Number(value)];
+  if (!preset) { status.textContent = '削除するプリセットを選択してください。'; return; }
+  if (!window.confirm(`プリセット「${preset.name}」を削除しますか？`)) return;
+  try {
+    await postJson(`/api/presets?name=${encodeURIComponent(preset.name)}`, 'DELETE');
+    await loadPresets();
+    status.textContent = 'プリセットを削除しました。';
+  } catch (error) { status.textContent = error.message; }
+}
+
+document.querySelector('#preset-save').addEventListener('click', savePreset);
+document.querySelector('#preset-apply').addEventListener('click', applyPreset);
+document.querySelector('#preset-delete').addEventListener('click', deletePreset);
+loadPresets().catch((error) => { document.querySelector('#preset-status').textContent = error.message; });
 
 function cancelActiveLookup() {
   if (activeJob === null) return;
@@ -571,6 +660,9 @@ async function showDirectory(id = '') {
 }
 
 async function showFile(id) {
+  document.querySelector('#preset-name').value = '';
+  document.querySelector('#preset-select').value = '';
+  document.querySelector('#preset-status').textContent = '';
   clearOnlineImage('front');
   clearOnlineBack();
   cancelActiveLookup();

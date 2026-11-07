@@ -9,6 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from contextlib import closing
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -70,14 +71,99 @@ class RestoreInput(BaseModel):
     expected_version: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-def require_local_origin(request: Request, *, mutation: bool = True) -> None:
+PRESET_FIELDS = {"artist", "album", "albumartist", "date", "tracknumber", "discnumber", "genre"}
+
+
+class PresetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=100)
+    tags: dict[str, str]
+    artwork: dict[str, ArtworkInput] = Field(default_factory=dict)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("名前を入力してください。")
+        return value
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: dict[str, str]) -> dict[str, str]:
+        if set(value) != PRESET_FIELDS or any(len(text) > 65535 or "\x00" in text for text in value.values()):
+            raise ValueError("プリセットのタグが不正です。")
+        return value
+
+    @field_validator("artwork")
+    @classmethod
+    def validate_images(cls, value: dict[str, ArtworkInput]) -> dict[str, ArtworkInput]:
+        if not set(value).issubset({"front", "back"}):
+            raise ValueError("画像の項目が不正です。")
+        for image in value.values():
+            try:
+                data = base64.b64decode(image.data or "", validate=True)
+                tag_editor._validate_artwork(tag_editor.ArtworkChange(data, image.mime))
+            except (ValueError, binascii.Error) as error:
+                raise ValueError("画像データが不正です。") from error
+        return value
+
+
+def require_local_origin(request: Request, *, mutation: bool = True, require_writes: bool = True) -> None:
     host = request.headers.get("host", "").lower()
     if host not in {"127.0.0.1:18081", "localhost:18081"}:
         raise HTTPException(status_code=403, detail="ローカルからのみ操作できます。")
     if mutation and request.headers.get("origin") != f"http://{host}":
         raise HTTPException(status_code=403, detail="同じ画面から操作してください。")
-    if mutation and not WRITES_ENABLED:
+    if mutation and require_writes and not WRITES_ENABLED:
         raise HTTPException(status_code=403, detail="タグ書き込みは無効です。")
+
+
+def preset_database() -> sqlite3.Connection:
+    DATA.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(DATA / "presets.sqlite3")
+    connection.execute("CREATE TABLE IF NOT EXISTS presets (name TEXT PRIMARY KEY, content TEXT NOT NULL)")
+    return connection
+
+
+@app.get("/api/presets")
+def list_presets(request: Request) -> list[dict[str, object]]:
+    require_local_origin(request, mutation=False)
+    with closing(preset_database()) as connection:
+        return [{"name": name, **json.loads(content)} for name, content in connection.execute("SELECT name, content FROM presets ORDER BY name")]
+
+
+@app.post("/api/presets", status_code=201)
+def save_preset(body: PresetInput, request: Request) -> dict[str, str]:
+    require_local_origin(request, require_writes=False)
+    content = body.model_dump(exclude={"name"})
+    with closing(preset_database()) as connection, connection:
+        try:
+            connection.execute("INSERT INTO presets (name, content) VALUES (?, ?)", (body.name, json.dumps(content)))
+        except sqlite3.IntegrityError as error:
+            raise HTTPException(status_code=409, detail="同じ名前のプリセットが存在します。") from error
+    return {"name": body.name}
+
+
+@app.put("/api/presets")
+def replace_preset(body: PresetInput, request: Request) -> dict[str, str]:
+    require_local_origin(request, require_writes=False)
+    content = body.model_dump(exclude={"name"})
+    with closing(preset_database()) as connection, connection:
+        result = connection.execute("UPDATE presets SET content = ? WHERE name = ?", (json.dumps(content), body.name))
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="プリセットが見つかりません。")
+    return {"name": body.name}
+
+
+@app.delete("/api/presets")
+def delete_preset(request: Request, name: str = Query(min_length=1, max_length=100)) -> dict[str, str]:
+    require_local_origin(request, require_writes=False)
+    with closing(preset_database()) as connection, connection:
+        result = connection.execute("DELETE FROM presets WHERE name = ?", (name,))
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="プリセットが見つかりません。")
+    return {"name": name}
 
 
 def file_key(path: Path) -> str:
