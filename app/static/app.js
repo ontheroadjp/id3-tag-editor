@@ -8,7 +8,6 @@ let generation = 0;
 let currentFile = null;
 let existingTags = {};
 let existingValues = {};
-let existingArtwork = false;
 let lookupGeneration = 0;
 let lastRecordings = null;
 let activeJob = null;
@@ -152,7 +151,6 @@ function resetSelection() {
   lastRecordings = null;
   existingTags = {};
   existingValues = {};
-  existingArtwork = false;
   audio.pause();
   audio.removeAttribute('src');
   audio.load();
@@ -307,11 +305,12 @@ function renderArtworkControls() {
   container.replaceChildren();
   const sides = fileFormat === 'mp3' ? ['front', 'back'] : ['cover'];
   for (const side of sides) {
-    const section = document.createElement('div');
-    section.className = 'artwork-edit';
-    const title = document.createElement('h3');
-    title.textContent = side === 'front' ? '表' : side === 'back' ? '裏' : '画像（1枚）';
-    section.append(title);
+    const row = document.createElement('tr');
+    const title = document.createElement('td');
+    title.textContent = side === 'front' ? 'アートワーク（表）' : side === 'back' ? 'アートワーク（裏）' : 'アートワーク';
+    const inputCell = document.createElement('td');
+    const toggleCell = document.createElement('td');
+    const existingCell = document.createElement('td');
     const items = existingArtworks[side] || [];
     if (items.length) {
       const gallery = document.createElement('div');
@@ -322,7 +321,9 @@ function renderArtworkControls() {
         image.src = `/api/files/${encodeURIComponent(currentFile)}/artwork?side=${side === 'back' ? 'back' : 'front'}&index=${index}&v=${encodeURIComponent(fileVersion)}`;
         gallery.append(image);
       });
-      section.append(gallery);
+      existingCell.append(gallery);
+    } else {
+      existingCell.textContent = '未設定';
     }
     if (fileFormat === 'mp3' && items.length > 1) {
       const target = document.createElement('select');
@@ -339,7 +340,7 @@ function renderArtworkControls() {
         artworkTargets[side] = target.value === '' ? null : Number(target.value);
         renderArtworkControls(); updateEditActions();
       });
-      section.append(target);
+      existingCell.append(target);
     }
     const source = document.createElement('select');
     source.disabled = operationBusy;
@@ -351,7 +352,7 @@ function renderArtworkControls() {
     }
     source.value = artworkChoices[side];
     source.addEventListener('change', () => { artworkChoices[side] = source.value; renderArtworkControls(); updateEditActions(); });
-    section.append(source);
+    inputCell.append(source);
     const file = document.createElement('input');
     file.type = 'file'; file.accept = 'image/jpeg,image/png';
     file.disabled = operationBusy;
@@ -370,13 +371,17 @@ function renderArtworkControls() {
       } catch (error) { document.querySelector('#save-status').textContent = error.message; }
       finally { pendingArtworkLoads--; updateEditActions(); }
     });
-    section.append(file);
-    if (artworkChoices[side] === 'upload' && artworkUploads[side]) {
+    inputCell.append(file);
+    const choice = artworkChoices[side];
+    const previewUrl = choice === 'upload' && artworkUploads[side]
+      ? `data:${artworkUploads[side].mime};base64,${artworkUploads[side].data}`
+      : onlineUrls[choice];
+    if (previewUrl) {
       const preview = document.createElement('img');
       preview.className = 'artwork-preview';
       preview.alt = `${title.textContent}の新しい画像`;
-      preview.src = `data:${artworkUploads[side].mime};base64,${artworkUploads[side].data}`;
-      section.append(preview);
+      preview.src = previewUrl;
+      inputCell.append(preview);
     }
     const toggle = document.createElement('button');
     toggle.type = 'button'; toggle.className = 'field-toggle';
@@ -388,8 +393,9 @@ function renderArtworkControls() {
       if (selectedArtwork.has(side)) selectedArtwork.delete(side); else selectedArtwork.add(side);
       renderArtworkControls(); updateEditActions();
     });
-    section.append(toggle);
-    container.append(section);
+    toggleCell.append(toggle);
+    row.append(title, inputCell, toggleCell, existingCell);
+    container.append(row);
   }
 }
 
@@ -426,17 +432,9 @@ async function refreshExisting(keepDraft = true) {
   existingArtworks = data.artworks || {};
   fileVersion = data.version;
   writeEnabled = data.write_enabled;
-  for (const selector of ['#player-panel', '#lookup-panel', '#online', '#artwork-panel']) document.querySelector(selector).hidden = false;
+  for (const selector of ['#player-panel', '#lookup-panel', '#online']) document.querySelector(selector).hidden = false;
   document.querySelector('#recovery-status').textContent = '';
   status.hidden = true;
-  const front = document.querySelector('#existing-artwork');
-  front.hidden = !data.artwork;
-  document.querySelector('#no-existing-artwork').hidden = data.artwork;
-  front.src = data.artwork ? `/api/files/${encodeURIComponent(currentFile)}/artwork?v=${encodeURIComponent(fileVersion)}` : '';
-  const back = document.querySelector('#existing-back-artwork');
-  back.hidden = !data.back_artwork;
-  document.querySelector('#no-existing-back-artwork').hidden = data.back_artwork;
-  back.src = data.back_artwork ? `/api/files/${encodeURIComponent(currentFile)}/artwork?side=back&v=${encodeURIComponent(fileVersion)}` : '';
   artworkTargets = Object.fromEntries(Object.keys(artworkChoices).map((side) => {
     const count = (existingArtworks[side] || []).length;
     return [side, count === 1 || side === 'cover' && count > 0 ? 0 : null];
@@ -677,8 +675,6 @@ async function showFile(id) {
   document.querySelector('#lookup-status').textContent = '';
   document.querySelector('#lookup-warning').textContent = '';
   document.querySelector('#candidates').replaceChildren();
-  document.querySelector('#online-artwork').hidden = true;
-  document.querySelector('#no-online-artwork').hidden = false;
   audio.pause();
   selected.hidden = true;
   status.hidden = false;
@@ -687,7 +683,7 @@ async function showFile(id) {
     const data = await getJson(`/api/files/${encodeURIComponent(id)}`);
     if (current !== generation) return;
     currentFile = id;
-    for (const selector of ['#player-panel', '#lookup-panel', '#online', '#artwork-panel']) document.querySelector(selector).hidden = false;
+    for (const selector of ['#player-panel', '#lookup-panel', '#online']) document.querySelector(selector).hidden = false;
     document.querySelector('#recovery-status').textContent = '';
     existingTags = data.tags;
     existingValues = data.tag_values || {};
@@ -698,23 +694,12 @@ async function showFile(id) {
     fileFormat = data.format;
     existingArtworks = data.artworks || {};
     onlineImages = {front: null, back: null};
-    existingArtwork = data.artwork;
     document.querySelector('#filename').textContent = data.name;
     const artwork = document.querySelector('#artwork');
     artwork.hidden = !data.artwork;
     document.querySelector('#no-artwork').hidden = data.artwork;
     artwork.src = data.artwork ? `/api/files/${encodeURIComponent(id)}/artwork` : '';
     audio.src = `/api/files/${encodeURIComponent(id)}/audio`;
-    const existing = document.querySelector('#existing-artwork');
-    existing.hidden = !existingArtwork;
-    document.querySelector('#no-existing-artwork').hidden = existingArtwork;
-    existing.src = existingArtwork ? `/api/files/${encodeURIComponent(id)}/artwork` : '';
-    document.querySelector('#existing-artwork-label').textContent = data.format === 'mp3' ? '既存画像（表）' : '既存画像';
-    document.querySelector('#existing-back-container').hidden = data.format !== 'mp3';
-    const back = document.querySelector('#existing-back-artwork');
-    back.hidden = !data.back_artwork;
-    document.querySelector('#no-existing-back-artwork').hidden = data.back_artwork;
-    back.src = data.back_artwork ? `/api/files/${encodeURIComponent(id)}/artwork?side=back` : '';
     setDraft(existingTags);
     renderComparison();
     renderArtworkControls();
@@ -731,7 +716,7 @@ async function showFile(id) {
       currentFile = id; fileVersion = data.version; fileFormat = data.format; writeEnabled = data.write_enabled;
       existingTags = {}; existingValues = {}; existingArtworks = {}; comments = [];
       setDraft(existingTags);
-      for (const selector of ['#player-panel', '#lookup-panel', '#online', '#artwork-panel']) document.querySelector(selector).hidden = true;
+      for (const selector of ['#player-panel', '#lookup-panel', '#online']) document.querySelector(selector).hidden = true;
       selected.hidden = false;
       status.textContent = 'タグを読み取れません。未完了の処理がある場合は履歴から復元できます。';
       document.querySelector('#recovery-status').textContent = status.textContent;
@@ -790,12 +775,6 @@ function clearOnlineBack() {
 }
 
 function clearOnlineImage(side) {
-  const image = document.querySelector(side === 'front' ? '#online-artwork' : '#online-back-artwork');
-  image.onload = null;
-  image.onerror = null;
-  image.hidden = true;
-  image.src = '';
-  document.querySelector(side === 'front' ? '#no-online-artwork' : '#no-online-back-artwork').hidden = false;
   if (typeof onlineImages !== 'undefined') onlineImages[side] = null;
   if (typeof onlineUrls !== 'undefined' && onlineUrls[side]) {
     URL.revokeObjectURL(onlineUrls[side]);
@@ -812,10 +791,6 @@ async function loadOnlineImage(side, releaseId, current) {
     if (current !== lookupGeneration) return;
     onlineImages[side] = data;
     onlineUrls[side] = URL.createObjectURL(blob);
-    const image = document.querySelector(side === 'front' ? '#online-artwork' : '#online-back-artwork');
-    image.src = onlineUrls[side];
-    image.hidden = false;
-    document.querySelector(side === 'front' ? '#no-online-artwork' : '#no-online-back-artwork').hidden = true;
     renderArtworkControls();
     updateEditActions();
   } catch (error) {
@@ -922,8 +897,6 @@ async function showCandidates(recordings, current, language = 'all') {
       editionList.replaceChildren();
       editionHint.textContent = `${group.title} の版を選択してください。`;
       document.querySelector('#lookup-status').textContent = '版を選ぶとタグ情報を比較できます。';
-      document.querySelector('#online-artwork').hidden = true;
-      document.querySelector('#no-online-artwork').hidden = false;
       resetComparisonDraft();
       const variants = [...group.variants].sort((a, b) => (a.release.date || '9999').localeCompare(b.release.date || '9999') || (a.release.country || '').localeCompare(b.release.country || ''));
       const editionButtons = [];
@@ -997,8 +970,6 @@ function changeLanguage() {
   clearOnlineImage('front');
   clearOnlineBack();
   const current = ++lookupGeneration;
-  document.querySelector('#online-artwork').hidden = true;
-  document.querySelector('#no-online-artwork').hidden = false;
   setDraft(existingTags);
   renderComparison();
   showCandidates(lastRecordings, current, document.querySelector('#release-language').value);
@@ -1017,8 +988,6 @@ async function startLookup() {
   document.querySelector('#candidates').replaceChildren();
   lastRecordings = null;
   document.querySelector('#lookup-warning').textContent = '';
-  document.querySelector('#online-artwork').hidden = true;
-  document.querySelector('#no-online-artwork').hidden = false;
   setDraft(existingTags);
   renderComparison();
   lookupStatus.textContent = '音声を照合中…';

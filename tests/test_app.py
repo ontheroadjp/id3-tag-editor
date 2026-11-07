@@ -245,12 +245,26 @@ const resetDisabled = elements.get('#reset-tags').disabled;
 const saveDisabled = elements.get('#save-tags').disabled;
 setDraft({title: 'Candidate'}); renderComparison();
 const candidateDisabled = elements.get('#save-tags').disabled;
-console.log(JSON.stringify({beforeSelect, afterSelect, arrow, resetValue, resetDisabled, saveDisabled, candidateDisabled}));
+existingArtworks = {front: [{description: 'cover', sha256: 'old'}], back: []};
+artworkTargets = {front: 0, back: null}; artworkChoices = {front: 'delete', back: 'back'};
+renderArtworkControls();
+const artworkRows = elements.get('#artwork-controls').children;
+const front = artworkRows[0];
+const artworkLabel = front.children[0].textContent;
+const inputTypes = front.children[1].children.map((item) => item.type || 'select');
+const existingImage = front.children[3].children[0].children[0].src;
+const missingArtwork = artworkRows[1].children[3].textContent;
+front.children[2].children[0].events.click();
+const artworkArrow = elements.get('#artwork-controls').children[0].children[2].children[0].textContent;
+console.log(JSON.stringify({beforeSelect, afterSelect, arrow, resetValue, resetDisabled, saveDisabled, candidateDisabled, artworkLabel, inputTypes, existingImage, missingArtwork, artworkArrow}));
 '''
     result = subprocess.run([node, '-e', harness + script + check], capture_output=True, text=True, check=True)
     assert json.loads(result.stdout) == {'beforeSelect': True, 'afterSelect': False, 'arrow': '⇒',
                                          'resetValue': 'Old', 'resetDisabled': True,
-                                         'saveDisabled': True, 'candidateDisabled': True}
+                                         'saveDisabled': True, 'candidateDisabled': True,
+                                         'artworkLabel': 'アートワーク（表）', 'inputTypes': ['select', 'file'],
+                                         'existingImage': '/api/files/file/artwork?side=front&index=0&v=',
+                                         'missingArtwork': '未設定', 'artworkArrow': '⇒'}
 
 
 def test_artwork_proxy_only_accepts_trusted_https_redirects(library):
